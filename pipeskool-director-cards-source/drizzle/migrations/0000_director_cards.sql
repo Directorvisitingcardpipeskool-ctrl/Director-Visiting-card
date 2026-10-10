@@ -1,0 +1,17 @@
+CREATE TYPE public.app_role AS ENUM ('admin');
+CREATE TABLE public.user_roles (id uuid PRIMARY KEY DEFAULT gen_random_uuid(), user_id uuid NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE, role public.app_role NOT NULL, UNIQUE(user_id,role));
+GRANT SELECT ON public.user_roles TO authenticated;
+GRANT ALL ON public.user_roles TO service_role;
+ALTER TABLE public.user_roles ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Read own role" ON public.user_roles FOR SELECT TO authenticated USING (user_id=auth.uid());
+CREATE FUNCTION public.has_role(_user_id uuid, _role public.app_role) RETURNS boolean LANGUAGE sql STABLE SECURITY DEFINER SET search_path=public AS $$ SELECT EXISTS(SELECT 1 FROM public.user_roles WHERE user_id=_user_id AND role=_role) $$;
+CREATE TABLE public.directors (id uuid PRIMARY KEY DEFAULT gen_random_uuid(), slug text UNIQUE NOT NULL, name text NOT NULL, designation text NOT NULL, phone text NOT NULL, email text NOT NULL, office_phone text NOT NULL DEFAULT '', website text NOT NULL DEFAULT 'https://pipeskoolprojects.com', address text NOT NULL DEFAULT '102, Darshak, Punjabi Hall Lane, Navrangpura, Ahmedabad 380009', photo_url text NOT NULL DEFAULT '', sort_order integer NOT NULL DEFAULT 0);
+GRANT SELECT ON public.directors TO anon;
+GRANT SELECT,INSERT,UPDATE,DELETE ON public.directors TO authenticated;
+GRANT ALL ON public.directors TO service_role;
+ALTER TABLE public.directors ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Public director cards" ON public.directors FOR SELECT TO anon,authenticated USING (true);
+CREATE POLICY "Admin creates directors" ON public.directors FOR INSERT TO authenticated WITH CHECK(public.has_role(auth.uid(),'admin'));
+CREATE POLICY "Admin edits directors" ON public.directors FOR UPDATE TO authenticated USING(public.has_role(auth.uid(),'admin')) WITH CHECK(public.has_role(auth.uid(),'admin'));
+CREATE POLICY "Admin removes directors" ON public.directors FOR DELETE TO authenticated USING(public.has_role(auth.uid(),'admin'));
+INSERT INTO public.directors(slug,name,designation,phone,email,office_phone,sort_order) VALUES ('keyal-shah','Keyal Shah','Director — Commercial & Finance','+91 98981 59970','projects@pipeskoolprojects.com','+91 82007 35058',0), ('ketul-shah','Ketul Shah','Director — Projects & Execution','+91 70690 96459','projects@pipeskoolprojects.com','+91 82007 35058',1);
